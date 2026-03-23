@@ -44,7 +44,9 @@ const allowedOrigins = [
     'https://offergenerator.vtabsquare.com',
     'https://offergenerator.vtabsquare.com/',
     'https://officeportal.vtabsquare.com',
-    'https://officeportal.vtabsquare.com/'
+    'https://officeportal.vtabsquare.com/',
+    'https://onboardingapp-renderdeployment-backend.onrender.com',
+    'https://onboardingapp-renderdeployment-backend.onrender.com/'
 ];
 
 app.use(cors({

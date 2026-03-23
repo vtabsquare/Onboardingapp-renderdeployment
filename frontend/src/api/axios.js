@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const API = axios.create({
     baseURL: import.meta.env.MODE === 'production'
-        ? 'https://offergenerator.vtabsquare.com/api'
+        ? 'https://onboardingapp-renderdeployment-backend.onrender.com/api'
         : 'http://localhost:5000/api',
 });
 
