@@ -46,7 +46,9 @@ const allowedOrigins = [
     'https://officeportal.vtabsquare.com',
     'https://officeportal.vtabsquare.com/',
     'https://onboardingapp-renderdeployment-backend.onrender.com',
-    'https://onboardingapp-renderdeployment-backend.onrender.com/'
+    'https://onboardingapp-renderdeployment-backend.onrender.com/',
+    'https://onboardingapp-renderdeployment.onrender.com',
+    'https://onboardingapp-renderdeployment.onrender.com/'
 ];
 
 app.use(cors({
@@ -84,6 +86,11 @@ app.use('/api/policies', policyAgreementRoutes);
 app.use('/api/relieving', relievingRoutes);
 app.use('/api/probation', probationRoutes);
 app.use('/api/salary-hike', salaryHikeRoutes);
+
+// Health check route for Render
+app.get('/', (req, res) => {
+    res.status(200).send('Backend API is running');
+});
 
 // Catch-all route for frontend
 app.get(/^(?!\/api).+/, (req, res) => {
