@@ -9,3 +9,6 @@ yarn-debug.log*
 yarn-error.log*
 .idea/
 .vscode/
+oauth2-credentials.json
+config/token.json
+render_env_vars.txt
