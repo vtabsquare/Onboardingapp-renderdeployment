@@ -1,10 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import API from '../api/axios';
-import { Download, LogOut, ChevronRight, MapPin, Building2, User, Calendar, Briefcase, Mail, Send, X, Loader2, Upload, DollarSign } from 'lucide-react';
-import { toPng } from 'html-to-image';
+import { Download, LogOut, ChevronRight, MapPin, Building2, User, Calendar, Briefcase, Mail, Send, X, Loader2, Upload, DollarSign, FileSpreadsheet, CheckCircle, ExternalLink, FileDown } from 'lucide-react';
+import { toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
+import { useEditable } from '../context/EditableContext';
 
 const SalaryHikeEditor = () => {
+    const { isEditable, customLogo, setCustomLogo, customSign, setCustomSign } = useEditable();
+    const logoInputRef = useRef();
+    const signInputRef = useRef();
+
+    const handleImageUpload = (e, setter) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setter(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
     const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
         employeeName: '',
@@ -24,9 +40,18 @@ const SalaryHikeEditor = () => {
     const [isSending, setIsSending] = useState(false);
     const [mailStatus, setMailStatus] = useState({ type: '', message: '' });
     const [coverLetter, setCoverLetter] = useState('');
+    const [selectedMailItem, setSelectedMailItem] = useState(null);
+
+    // Bulk upload state
+    const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+    const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+    const [bulkResults, setBulkResults] = useState(null);
+    const [showBulkResults, setShowBulkResults] = useState(false);
 
     const previewRef = useRef();
     const photoInputRef = useRef();
+    const bulkUploadRef = useRef();
+    const savedFormDataRef = useRef(null);
 
     // Sync Cover Letter with Form Data
     useEffect(() => {
@@ -72,6 +97,7 @@ VTAB Square Pvt Ltd
     };
 
     const validateForm = () => {
+        if (isEditable) return true;
         const requiredFields = [
             'employeeName', 'doorNo', 'street', 'addressLine1',
             'district', 'state', 'pincode', 'newSalary', 'effectiveDate'
@@ -114,6 +140,167 @@ VTAB Square Pvt Ltd
         return true;
     };
 
+    const downloadTemplate = () => {
+        const wsData = [
+            ['Issue Date', 'Employee Name', 'Door No', 'Street', 'Address Line 1', 'Address Line 2', 'District', 'State', 'Pincode', 'New Salary (INR) *', 'Effective Date', 'Employee Photo URL'],
+            ['2025-05-01', 'John Doe', '12', 'Main Street', 'Apt 4B', 'Building Complex', 'Chennai', 'Tamil Nadu', '600001', '250000', '2025-06-01', 'https://drive.google.com/file/d/.../view']
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        ws['!cols'] = [
+            { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 40 }
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Salary Hike');
+        XLSX.writeFile(wb, 'Salary_Hike_Template.xlsx');
+    };
+
+    const capturePreviewAsPdfBase64 = async () => {
+        const element = previewRef.current;
+        if (!element) return null;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pages = element.children;
+        for (let i = 0; i < pages.length; i++) {
+            if (i > 0) pdf.addPage();
+            const sanitize = (el) => {
+                const elements = el.querySelectorAll('*');
+                [el, ...elements].forEach(node => {
+                    if (node.nodeType !== 1) return;
+                    const style = window.getComputedStyle(node);
+                    ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'].forEach(prop => {
+                        const val = style[prop];
+                        if (val && (val.includes('oklch') || val.includes('oklab') || val.includes('color-mix'))) {
+                            node.style[prop] = val;
+                        }
+                    });
+                });
+            };
+            sanitize(pages[i]);
+            const dataUrl = await toJpeg(pages[i], { quality: 0.85, pixelRatio: 1.5, skipFonts: true });
+            pdf.addImage(dataUrl, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+        }
+        return pdf.output('datauristring');
+    };
+
+    const loadPhotoFromUrl = async (url) => {
+        if (!url) return null;
+        try {
+            const driveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (!driveMatch) return null;
+            const fileId = driveMatch[1];
+            const directUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
+            const res = await fetch(directUrl);
+            const blob = await res.blob();
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+        } catch (err) {
+            console.error('Failed to load photo:', err.message);
+            return null;
+        }
+    };
+
+    const handleBulkUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        e.target.value = '';
+        setIsBulkProcessing(true);
+        setBulkProgress({ current: 0, total: 0 });
+        setBulkResults(null);
+        try {
+            const data = await file.arrayBuffer();
+            const wb = XLSX.read(data, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+            if (rows.length < 2) { alert('No data rows found.'); setIsBulkProcessing(false); return; }
+            
+            const hdr = rows[0].map(h => String(h || '').trim());
+            const col = (name) => hdr.findIndex(h => h.toLowerCase() === name.toLowerCase());
+            const colMap = {
+                date: col('Issue Date'),
+                employeeName: col('Employee Name'),
+                doorNo: col('Door No'),
+                street: col('Street'),
+                addressLine1: col('Address Line 1'),
+                addressLine2: col('Address Line 2'),
+                district: col('District'),
+                state: col('State'),
+                pincode: col('Pincode'),
+                newSalary: col('New Salary (INR) *'),
+                effectiveDate: col('Effective Date'),
+                photoUrl: col('Employee Photo URL')
+            };
+
+            const dataRows = rows.slice(1).filter(r => r.some(c => c !== undefined && c !== ''));
+            if (dataRows.length === 0) { alert('No valid data rows.'); setIsBulkProcessing(false); return; }
+            savedFormDataRef.current = { ...formData };
+            setBulkProgress({ current: 0, total: dataRows.length });
+
+            const candidatesArr = [];
+            for (let i = 0; i < dataRows.length; i++) {
+                const row = dataRows[i];
+                const get = (idx) => idx >= 0 && row[idx] !== undefined ? String(row[idx]).trim() : '';
+                const employeeName = get(colMap.employeeName);
+                if (!employeeName) continue;
+                
+                const photoUrl = get(colMap.photoUrl);
+                const photoBase64 = photoUrl ? await loadPhotoFromUrl(photoUrl) : null;
+                
+                const rowData = {
+                    date: get(colMap.date) || new Date().toISOString().split('T')[0],
+                    employeeName,
+                    doorNo: get(colMap.doorNo),
+                    street: get(colMap.street),
+                    addressLine1: get(colMap.addressLine1),
+                    addressLine2: get(colMap.addressLine2),
+                    district: get(colMap.district),
+                    state: get(colMap.state),
+                    pincode: get(colMap.pincode),
+                    newSalary: get(colMap.newSalary) || '20000',
+                    effectiveDate: get(colMap.effectiveDate),
+                    photo: photoBase64
+                };
+
+                setFormData(rowData);
+                await new Promise(r => setTimeout(r, 500));
+                
+                const pdfDataUri = await capturePreviewAsPdfBase64();
+                if (pdfDataUri) {
+                    candidatesArr.push({
+                        date: rowData.date,
+                        employeeName: rowData.employeeName,
+                        doorNo: rowData.doorNo,
+                        street: rowData.street,
+                        addressLine1: rowData.addressLine1,
+                        addressLine2: rowData.addressLine2,
+                        district: rowData.district,
+                        state: rowData.state,
+                        pincode: rowData.pincode,
+                        newSalary: rowData.newSalary,
+                        effectiveDate: rowData.effectiveDate,
+                        pdfBase64: pdfDataUri
+                    });
+                }
+                setBulkProgress({ current: i + 1, total: dataRows.length });
+            }
+
+            if (savedFormDataRef.current) setFormData(savedFormDataRef.current);
+            if (candidatesArr.length === 0) { alert('No valid candidates found.'); setIsBulkProcessing(false); return; }
+
+            const response = await API.post('/salary-hike/bulk-upload', { candidates: candidatesArr });
+            const { results, total } = response.data;
+            const enriched = results.map(r => ({ ...r, ...(candidatesArr.find(c => c.employeeName === r.candidateName) || {}) }));
+            setBulkResults({ total, results: enriched });
+            setShowBulkResults(true);
+
+        } catch (err) {
+            alert(`Bulk upload failed: ${err.response?.data?.message || err.message}`);
+        } finally {
+            setIsBulkProcessing(false);
+        }
+    };
+
     const downloadPDF = async () => {
         if (!validateForm()) return;
         try {
@@ -142,13 +329,13 @@ VTAB Square Pvt Ltd
 
                 sanitize(pages[i]);
 
-                const dataUrl = await toPng(pages[i], {
-                    quality: 1,
-                    pixelRatio: 2,
+                const dataUrl = await toJpeg(pages[i], {
+                    quality: 0.8,
+                    pixelRatio: 1.5,
                     skipFonts: true,
                 });
 
-                pdf.addImage(dataUrl, 'PNG', 0, 0, 210, 297);
+                pdf.addImage(dataUrl, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
             }
             pdf.save(`Salary_Hike_Notification_${formData.employeeName || 'Employee'}.pdf`);
         } catch (error) {
@@ -184,8 +371,8 @@ VTAB Square Pvt Ltd
 
                 sanitize(pages[i]);
 
-                const dataUrl = await toPng(pages[i], {
-                    quality: 0.6,
+                const dataUrl = await toJpeg(pages[i], {
+                    quality: 0.7,
                     pixelRatio: 1.2,
                     skipFonts: true,
                 });
@@ -202,20 +389,72 @@ VTAB Square Pvt Ltd
 
     const handleSendMail = async (e) => {
         e.preventDefault();
-        if (!validateForm()) return;
+        
+        let pdfDataUri = null;
+        let candidateName = '';
+        let customFileName = '';
+        let dynamicCoverLetter = '';
+
+        if (selectedMailItem) {
+            if (!selectedMailItem.pdfBase64) {
+                setMailStatus({ type: 'error', message: 'PDF data missing for this candidate.' });
+                return;
+            }
+            pdfDataUri = selectedMailItem.pdfBase64;
+            candidateName = selectedMailItem.employeeName || 'Employee';
+            customFileName = `Salary_Hike_Notification_${candidateName}.pdf`;
+
+            const formattedDate = selectedMailItem.effectiveDate
+                ? new Date(selectedMailItem.effectiveDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                : '24 April 2025';
+
+            dynamicCoverLetter = `Subject: Salary Hike Notification
+
+Dear Mr. ${candidateName},
+
+Greetings from VTAB Square Pvt Ltd.
+
+We are pleased to inform you that, based on your outstanding performance and valuable contributions to the organization, your compensation has been reviewed and revised.
+
+Please find attached your Salary Hike Notification Letter for your reference. As per the revision, your new annual salary will be INR ${selectedMailItem.newSalary || '20,000'} per annum, and the updated compensation will be effective from ${formattedDate}.
+
+We appreciate your hard work, dedication, and the value you bring to the organization. This revision reflects our recognition of your efforts and commitment to the continued success of VTAB Square Pvt Ltd.
+
+Your revised salary will be reflected in your payroll from the effective date mentioned above.
+
+If you have any questions regarding this revision, please feel free to contact the HR Department.
+
+Congratulations on this well-deserved salary hike, and we look forward to your continued contributions to the growth and success of the organization.
+
+Best Regards,
+Vimala C
+Managing Director
+Authorized Signatory
+VTAB Square Pvt Ltd
+(Now Part of Siroco)`;
+
+        } else {
+            if (!validateForm()) return;
+            pdfDataUri = await generatePDFBlob();
+            if (!pdfDataUri) {
+                setMailStatus({ type: 'error', message: 'Failed to generate PDF' });
+                return;
+            }
+            candidateName = formData.employeeName || 'Employee';
+            customFileName = `Salary_Hike_Notification_${candidateName}.pdf`;
+            dynamicCoverLetter = coverLetter;
+        }
+
         setIsSending(true);
         setMailStatus({ type: '', message: '' });
 
         try {
-            const pdfDataUri = await generatePDFBlob();
-            if (!pdfDataUri) throw new Error('Failed to generate PDF');
-
-            const response = await API.post('/offer/send-email', {
+            const response = await API.post('/salary-hike/send-email', {
                 toEmail: recipientEmail,
-                candidateName: formData.employeeName || 'Employee',
+                candidateName,
                 customSubject: `Salary Hike Notification`,
-                customFileName: `Salary_Hike_Notification_${formData.employeeName || 'Employee'}.pdf`,
-                customMailContent: coverLetter,
+                customFileName,
+                customMailContent: dynamicCoverLetter,
                 pdfBase64: pdfDataUri
             });
 
@@ -225,6 +464,7 @@ VTAB Square Pvt Ltd
                     setShowMailModal(false);
                     setRecipientEmail('');
                     setMailStatus({ type: '', message: '' });
+                    setSelectedMailItem(null);
                 }, 2000);
             }
         } catch (error) {
@@ -241,6 +481,22 @@ VTAB Square Pvt Ltd
 
     return (
         <div className="flex-1 flex flex-col font-sans min-h-0">
+            {/* Hidden File Inputs */}
+            <input
+                type="file"
+                ref={logoInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, setCustomLogo)}
+            />
+            <input
+                type="file"
+                ref={signInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => handleImageUpload(e, setCustomSign)}
+            />
+
             {/* Header */}
             <header className="bg-white border-b border-slate-100 px-4 md:px-8 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
                 <div>
@@ -269,6 +525,7 @@ VTAB Square Pvt Ltd
                 {/* Editor Panel */}
                 <div className="w-full md:w-[340px] lg:w-[400px] bg-white border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto p-5 md:p-8 custom-scrollbar shadow-sm z-40 flex-shrink-0">
                     <div className="space-y-10">
+                        
                         {/* Basic Info */}
                         <section>
                             <div className="flex items-center gap-3 mb-6">
@@ -478,6 +735,56 @@ VTAB Square Pvt Ltd
                             </div>
                         </section>
                         */}
+
+                        {/* ── Bulk Upload Section ── */}
+                        <section>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 bg-violet-50 rounded-lg">
+                                    <FileSpreadsheet className="w-4 h-4 text-violet-600" />
+                                </div>
+                                <h3 className="text-slate-900 font-bold text-base">Bulk Generation</h3>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Download the template, fill in multiple candidates, then upload to generate & save all PDFs to Google Drive.
+                            </p>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={downloadTemplate}
+                                    className="w-full flex items-center justify-center gap-2 border-2 border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-xl py-2.5 px-4 text-sm font-semibold transition-all active:scale-[0.98]"
+                                >
+                                    <FileDown className="w-4 h-4" />
+                                    Download Template
+                                </button>
+
+                                <input
+                                    type="file"
+                                    accept=".xlsx, .xls"
+                                    onChange={handleBulkUpload}
+                                    ref={bulkUploadRef}
+                                    className="hidden"
+                                    id="bulk-upload-input"
+                                    disabled={isBulkProcessing}
+                                />
+
+                                <button
+                                    onClick={() => bulkUploadRef.current?.click()}
+                                    disabled={isBulkProcessing}
+                                    className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl py-2.5 px-4 text-sm font-semibold transition-all shadow-lg shadow-violet-100 active:scale-[0.98]"
+                                >
+                                    {isBulkProcessing ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Processing {bulkProgress.current}/{bulkProgress.total}...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload className="w-4 h-4" />
+                                            Bulk Upload
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </section>
                     </div>
                 </div>
 
@@ -488,32 +795,62 @@ VTAB Square Pvt Ltd
                             {/* PAGE 1: COVER */}
                             <div className="relative h-[297mm] bg-[#0A2458] overflow-hidden flex flex-col">
                                 <div className="flex justify-between items-start pt-12 px-12 pb-20">
-                                    <div className="text-white text-[10px] leading-tight font-light">
+                                    <div
+                                        className={`text-white text-[10px] leading-relaxed font-light border border-transparent ${isEditable ? 'outline-none hover:bg-white/10 focus:bg-white/20' : ''}`}
+                                        contentEditable={isEditable}
+                                        suppressContentEditableWarning={true}
+                                    >
                                         www.sirocotech.com<br />
-                                        sales@sirocotech.com<br />
+                                        sales@sirocollc.com<br />
                                         US: (844) 708-0008<br />
-                                        IND: (996) 259-7975
+                                        IND: (996) 258-7975
                                     </div>
-                                    <div className="flex flex-col items-center">
-                                        <div className="mb-2 bg-white p-2 w-18 h-18 flex items-center justify-center">
-                                            <img src="/vtab.jpg" alt="VTAB" className="w-10 h-10 object-contain" />
-                                        </div>
-                                        <div className="text-[10px] font-bold tracking-widest uppercase text-white opacity-80 mb-2">Now part of</div>
-                                        <img src="/siroco.jpeg" alt="SIROCO" className="h-8 object-contain" />
+                                    <div className={`flex flex-col items-center justify-center border border-transparent ${isEditable ? 'cursor-pointer hover:bg-white/10 transition-colors' : ''}`} onClick={() => isEditable && logoInputRef.current.click()}>
+                                        {customLogo ? (
+                                            <img src={customLogo} alt="Custom Logo" className="max-h-24 w-auto object-contain" />
+                                        ) : (
+                                            <>
+                                                <div className="mb-2 bg-white p-2 w-18 h-18 flex items-center justify-center">
+                                                    <img src="/vtab.jpg" alt="VTAB" className="w-10 h-10 object-contain" />
+                                                </div>
+                                                <div className="text-[10px] font-bold tracking-widest uppercase text-white opacity-80 mb-2">Now part of</div>
+                                                <img src="/siroco.jpeg" alt="SIROCO" className="h-8 object-contain" />
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="flex-1 flex flex-col items-center justify-center text-center px-12">
-                                    <div className="text-white text-2xl font-medium mb-6 uppercase tracking-[0.2em] opacity-90 text-[14px]">Prepared for</div>
+                                <div className="flex-1 flex flex-col items-center justify-center text-center px-12 min-h-[400px]">
+                                    <div
+                                        className={`text-white text-2xl font-medium mb-6 uppercase tracking-[0.2em] opacity-90 text-[14px] border border-transparent ${isEditable ? 'outline-none hover:bg-white/10 focus:bg-white/20' : ''}`}
+                                        contentEditable={isEditable}
+                                        suppressContentEditableWarning={true}
+                                    >
+                                        Prepared for
+                                    </div>
                                     <div className="w-64 h-[1px] bg-white/20 mb-8"></div>
-                                    <div className="text-white text-xl font-light tracking-[0.15em] uppercase leading-relaxed text-[16px]">
+                                    <div
+                                        className={`text-white text-xl font-light tracking-[0.15em] uppercase leading-relaxed text-[16px] border border-transparent ${isEditable ? 'outline-none hover:bg-white/10 focus:bg-white/20' : ''}`}
+                                        contentEditable={isEditable}
+                                        suppressContentEditableWarning={true}
+                                    >
                                         Salary Hike Notification
                                     </div>
                                 </div>
 
                                 <div className="bg-white pt-10 px-12 pb-12 mt-auto">
-                                    <h4 className="text-[#0A2458] font-bold text-xs mb-1 text-center italic">Statement of Confidentiality</h4>
-                                    <p className="text-[10px] leading-relaxed text-slate-800 text-center font-medium opacity-80">
+                                    <h4
+                                        className={`text-[#0A2458] font-bold text-xs mb-1 text-center italic ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                        contentEditable={isEditable}
+                                        suppressContentEditableWarning={true}
+                                    >
+                                        Statement of Confidentiality
+                                    </h4>
+                                    <p
+                                        className={`text-[10px] leading-relaxed text-slate-800 text-center font-medium opacity-80 ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                        contentEditable={isEditable}
+                                        suppressContentEditableWarning={true}
+                                    >
                                         This proposal has been distributed on a confidential basis for your information only. By accepting it, you agree not to disseminate it to any other person or entity in any manner and not to use the information for any purpose other than considering opportunities for a cooperative business relationship with owner of portfolio.
                                     </p>
                                 </div>
@@ -522,18 +859,28 @@ VTAB Square Pvt Ltd
                             {/* PAGE 2: MAIN LETTER */}
                             <div className="relative h-[297mm] bg-white overflow-hidden flex flex-col">
                                 <div className="bg-[#0A2458] flex justify-between items-start pt-8 px-12 pb-8">
-                                    <div className="text-white text-[10px] leading-tight font-light">
+                                    <div
+                                        className={`text-white text-[10px] leading-relaxed font-light ${isEditable ? 'outline-none hover:bg-white/10 focus:bg-white/20' : ''}`}
+                                        contentEditable={isEditable}
+                                        suppressContentEditableWarning={true}
+                                    >
                                         www.sirocotech.com<br />
-                                        sales@sirocotech.com<br />
+                                        sales@sirocollc.com<br />
                                         US: (844) 708-0008<br />
-                                        IND: (996) 259-7975
+                                        IND: (996) 258-7975
                                     </div>
-                                    <div className="flex flex-col items-center">
-                                                                                <div className="mb-2 bg-white p-2 w-14 h-14 flex items-center justify-center">
-                                            <img src="/vtab.jpg" alt="VTAB" className="w-10 h-10 object-contain" />
-                                        </div>
-                                        <div className="text-[10px] font-bold tracking-widest uppercase text-white opacity-80 mb-2">Now part of</div>
-                                        <img src="/siroco.jpeg" alt="SIROCO" className="h-8 object-contain" />
+                                    <div className={`flex flex-col items-center justify-center border border-transparent ${isEditable ? 'cursor-pointer hover:bg-white/10 transition-colors' : ''}`} onClick={() => isEditable && logoInputRef.current.click()}>
+                                        {customLogo ? (
+                                            <img src={customLogo} alt="Custom Logo" className="max-h-20 w-auto object-contain" />
+                                        ) : (
+                                            <>
+                                                <div className="mb-2 bg-white p-2 w-14 h-14 flex items-center justify-center">
+                                                    <img src="/vtab.jpg" alt="VTAB" className="w-10 h-10 object-contain" />
+                                                </div>
+                                                <div className="text-[10px] font-bold tracking-widest uppercase text-white opacity-80 mb-2">Now part of</div>
+                                                <img src="/siroco.jpeg" alt="SIROCO" className="h-8 object-contain" />
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -549,11 +896,27 @@ VTAB Square Pvt Ltd
 
                                     <div className="mt-8 space-y-8">
                                         <div className="text-[14px]">
-                                            <h2 className="text-xl font-bold text-[#0A2458] mb-6">Dear {formData.employeeName || '[Name]'},</h2>
+                                            <h2
+                                                className={`text-xl font-bold text-[#0A2458] mb-6 border border-transparent ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50 transition-colors' : ''}`}
+                                                contentEditable={isEditable}
+                                                suppressContentEditableWarning={true}
+                                            >
+                                                Dear {formData.employeeName || '[Name]'},
+                                            </h2>
 
-                                            <div className="mb-8">
-                                                <p className="font-bold border-b border-slate-900 w-max mb-2 uppercase tracking-wide">Address:</p>
-                                                <div className="text-[13px] leading-relaxed text-slate-800">
+                                            <div className="mb-8 min-h-[100px]">
+                                                <p
+                                                    className={`font-bold border-b border-slate-900 w-max mb-2 uppercase tracking-wide border-t border-l border-r border-transparent ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50 transition-colors' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
+                                                    Address:
+                                                </p>
+                                                <div
+                                                    className={`text-[13px] leading-relaxed text-slate-800 border border-transparent ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
                                                     {formData.doorNo && <span>{formData.doorNo}, </span>}
                                                     {formData.street && <span>{formData.street}, </span>}
                                                     <br />
@@ -567,31 +930,83 @@ VTAB Square Pvt Ltd
                                             </div>
 
                                             <div className="mb-8">
-                                                <p className="font-bold border-b border-slate-900 w-max mb-4 uppercase tracking-wide italic">Re: Salary Hike Notification</p>
-                                                <p className="leading-relaxed text-justify">
+                                                <p
+                                                    className={`font-bold border-b border-slate-900 w-max mb-4 uppercase tracking-wide italic border-t border-l border-r border-transparent ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50 transition-colors' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
+                                                    Re: Salary Hike Notification
+                                                </p>
+                                                <p
+                                                    className={`leading-relaxed text-justify border border-transparent ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
                                                     We are pleased to inform you that, based on your outstanding performance and contributions to <span className="font-bold text-[#0A2458]">VTAB Square Pvt Ltd Now Part of Siroco Technology</span>, we have reviewed your compensation. As a result, we are delighted to offer you a revised salary, effective from <span className="font-bold">[{formData.effectiveDate}]</span>.
                                                 </p>
                                             </div>
 
                                             <ul className="space-y-4 text-[13px] list-disc list-outside ml-5">
-                                                <li>Your new annual salary will be <span className="font-bold">INR {formData.newSalary} per annum.</span></li>
-                                                <li>We recognize your hard work, dedication, and the value you bring to our organization. This salary adjustment is our way of acknowledging your efforts and ensuring that you are fairly compensated for your role and responsibilities.</li>
-                                                <li>We believe that this salary increase is well-deserved and will help you in achieving your financial goals. Your new salary will be reflected in your payroll starting from <span className="font-bold">{formData.effectiveDate}</span>.</li>
-                                                <li>If you have any questions or require further clarification regarding this salary revision, please do not hesitate to reach out to the Human Resources department.</li>
-                                                <li>Once again, congratulations on this well-deserved salary hike, and we look forward to your continued contributions to our company's success.</li>
+                                                <li
+                                                    className={`border border-transparent ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
+                                                    Your new annual salary will be <span className="font-bold">INR {formData.newSalary} per annum.</span>
+                                                </li>
+                                                <li
+                                                    className={`${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
+                                                    We recognize your hard work, dedication, and the value you bring to our organization. This salary adjustment is our way of acknowledging your efforts and ensuring that you are fairly compensated for your role and responsibilities.
+                                                </li>
+                                                <li
+                                                    className={`${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
+                                                    We believe that this salary increase is well-deserved and will help you in achieving your financial goals. Your new salary will be reflected in your payroll starting from <span className="font-bold">{formData.effectiveDate}</span>.
+                                                </li>
+                                                <li
+                                                    className={`${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
+                                                    If you have any questions or require further clarification regarding this salary revision, please do not hesitate to reach out to the Human Resources department.
+                                                </li>
+                                                <li
+                                                    className={`${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                    contentEditable={isEditable}
+                                                    suppressContentEditableWarning={true}
+                                                >
+                                                    Once again, congratulations on this well-deserved salary hike, and we look forward to your continued contributions to our company's success.
+                                                </li>
                                             </ul>
                                         </div>
 
                                         <div className="mt-12 text-[13px]">
-                                            <p className="mb-4">Sincerely,</p>
-                                            <div className="mb-4">
-                                                <img src="/sign.jpeg" alt="Signature" className="h-16 w-auto object-contain" />
+                                            <div
+                                                className={`${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50 mb-4' : 'mb-4'}`}
+                                                contentEditable={isEditable}
+                                                suppressContentEditableWarning={true}
+                                            >
+                                                Sincerely,
+                                            </div>
+                                            <div className={`mb-4 inline-block ${isEditable ? 'cursor-pointer hover:bg-indigo-50/50 focus:bg-indigo-50 transition-all' : ''}`} onClick={() => isEditable && signInputRef.current.click()}>
+                                                <img src={customSign || "/sign.jpeg"} alt="Signature" className="h-16 w-auto object-contain" />
                                             </div>
                                             <div className="w-52 border-b border-slate-300 mt-2 mb-2"></div>
-                                            Authorized Signatory<br />
-                                            Vimala C.<br />
-                                            Managing Director<br />
-                                            VTAB Square Pvt Ltd (Now Part of Siroco)
+                                            <div
+                                                className={`${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50 leading-relaxed' : 'leading-relaxed'}`}
+                                                contentEditable={isEditable}
+                                                suppressContentEditableWarning={true}
+                                            >
+                                                Authorized Signatory<br />
+                                                Vimala C.<br />
+                                                Managing Director<br />
+                                                VTAB Square Pvt Ltd (Now Part of Siroco)
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -611,15 +1026,29 @@ VTAB Square Pvt Ltd
                                 <div className="px-12 space-y-8 flex-1">
                                     {/* USA */}
                                     <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                        <div className="bg-[#D14343] text-white text-center py-2 text-xl font-bold uppercase tracking-widest">USA</div>
-                                        <div className="p-8 flex justify-between bg-slate-50 text-[13px] leading-relaxed">
-                                            <div>
+                                        <div
+                                            className={`bg-[#D14343] text-white text-center py-2 text-xl font-bold uppercase tracking-widest ${isEditable ? 'outline-none hover:bg-white/10' : ''}`}
+                                            contentEditable={isEditable}
+                                            suppressContentEditableWarning={true}
+                                        >
+                                            USA
+                                        </div>
+                                        <div className="p-8 flex justify-between bg-slate-50 text-[13px] leading-relaxed border-t border-slate-200">
+                                            <div
+                                                className={`flex-1 pr-6 ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                contentEditable={isEditable}
+                                                suppressContentEditableWarning={true}
+                                            >
                                                 <p className="font-bold text-[#0A2458] mb-2 uppercase tracking-wide">SIROCo Corporate Office</p>
                                                 <p className="text-slate-700 font-bold">6800 Weiskopf Avenue,<br />Suite 150 McKinney,<br />TX 75070 USA</p>
                                                 <p className="mt-4"><span className="font-bold text-black">Phone:</span> <span className="text-black">(844) 708-0008</span></p>
                                                 <p><span className="font-bold text-black">Email:</span> <span className="text-black">sales@sirocollc.com</span></p>
                                             </div>
-                                            <div className="pl-8">
+                                            <div
+                                                className={`pl-8 ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                                contentEditable={isEditable}
+                                                suppressContentEditableWarning={true}
+                                            >
                                                 <p className="font-bold text-[#0A2458] mb-2 uppercase tracking-wide">Regional Offices</p>
                                                 <div className="grid grid-cols-1 gap-1 text-black font-bold">
                                                     <span>Atlanta</span>
@@ -634,15 +1063,29 @@ VTAB Square Pvt Ltd
 
                                     {/* India */}
                                     <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                        <div className="bg-[#EFA740] text-white text-center py-2 text-xl font-bold uppercase tracking-widest">India</div>
-                                        <div className="p-8 flex justify-between bg-slate-50 text-[13px] leading-relaxed">
-                                            <div className="flex-1 pr-6 border-r border-slate-200">
+                                        <div
+                                            className={`bg-[#EFA740] text-white text-center py-2 text-xl font-bold uppercase tracking-widest ${isEditable ? 'outline-none hover:bg-white/10' : ''}`}
+                                            contentEditable={isEditable}
+                                            suppressContentEditableWarning={true}
+                                        >
+                                            India
+                                        </div>
+                                        <div className="p-8 flex justify-between bg-slate-50 text-[13px] leading-relaxed border-t border-slate-200">
+                                            <div
+                                                className={`flex-1 pr-6 border-r border-slate-200 ${isEditable ? 'outline-none focus:ring-1 focus:ring-indigo-100 p-2 rounded' : ''}`}
+                                                contentEditable={isEditable}
+                                                suppressContentEditableWarning={true}
+                                            >
                                                 <p className="font-bold text-[#0A2458] mb-2 uppercase tracking-wide">Development Innovation Center</p>
                                                 <p className="text-slate-700 font-bold">Module 12, Thejaswini Building,<br />Technopark, Karyavattom – 695581<br />Kerala, INDIA</p>
                                                 <p className="mt-4"><span className="font-bold text-black">Phone:</span> <span className="text-black">+91 80868 00199</span></p>
                                                 <p><span className="font-bold text-black">Email:</span> <span className="text-black">info@sirocotech.com</span></p>
                                             </div>
-                                            <div className="flex-1 pl-6">
+                                            <div
+                                                className={`flex-1 pl-6 ${isEditable ? 'outline-none focus:ring-1 focus:ring-indigo-100 p-2 rounded' : ''}`}
+                                                contentEditable={isEditable}
+                                                suppressContentEditableWarning={true}
+                                            >
                                                 <p className="font-bold text-[#0A2458] mb-2 uppercase tracking-wide">IT DEVELOPMENT CENTER</p>
                                                 <p className="text-slate-700 font-bold leading-snug">17/99, 5th street 2nd Floor, lyyappa Nagar,<br />Vijayalakshmi Mills, Kuniyamuthur, Palakkad<br />Main Road, Coimbatore 641008, Tamil Nadu, India</p>
                                                 <p className="mt-4"><span className="font-bold text-black">Mail id:</span> <span className="text-black">Information@vtabsquare.com</span></p>
@@ -652,12 +1095,24 @@ VTAB Square Pvt Ltd
 
                                     {/* MENA */}
                                     <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                                        <div className="bg-[#3FA15A] text-white text-center py-2 text-xl font-bold uppercase tracking-widest">MENA</div>
-                                        <div className="p-8 bg-slate-50 text-[13px] leading-relaxed">
-                                            <p className="font-bold text-[#0A2458] mb-2 uppercase tracking-wide">Regional Office</p>
-                                            <p className="text-slate-700 font-bold">Amman Jordan</p>
-                                            <p className="mt-4"><span className="font-bold text-black">Phone:</span> <span className="text-black">+962 65737421</span></p>
-                                            <p><span className="font-bold text-black">Email:</span> <span className="text-black">sales@sirocomena.com</span></p>
+                                        <div
+                                            className={`bg-[#3FA15A] text-white text-center py-2 text-xl font-bold uppercase tracking-widest ${isEditable ? 'outline-none focus:ring-2 focus:ring-white/50' : ''}`}
+                                            contentEditable={isEditable}
+                                            suppressContentEditableWarning={true}
+                                        >
+                                            MENA
+                                        </div>
+                                        <div className="p-8 bg-slate-50 text-[13px] leading-relaxed border-t border-slate-200">
+                                            <div
+                                                className={`${isEditable ? 'outline-none focus:ring-1 focus:ring-indigo-100 p-2 rounded' : ''}`}
+                                                contentEditable={isEditable}
+                                                suppressContentEditableWarning={true}
+                                            >
+                                                <p className="font-bold text-[#0A2458] mb-2 uppercase tracking-wide">Regional Office</p>
+                                                <p className="text-slate-700 font-bold">Amman Jordan</p>
+                                                <p className="mt-4"><span className="font-bold text-black">Phone:</span> <span className="text-black">+962 65737421</span></p>
+                                                <p><span className="font-bold text-black">Email:</span> <span className="text-black">sales@sirocomena.com</span></p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -679,29 +1134,103 @@ VTAB Square Pvt Ltd
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
             `}</style>
 
+            {/* Bulk Results Modal */}
+            {showBulkResults && bulkResults && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg flex flex-col overflow-hidden transform animate-in zoom-in-95 duration-300">
+                        <div className="bg-indigo-600 px-8 py-10 text-white relative">
+                            <button onClick={() => { setShowBulkResults(false); setBulkResults(null); }} className="absolute right-8 top-8 text-white/50 hover:text-white transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                            <div className="flex flex-col items-start gap-4">
+                                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                                    <FileSpreadsheet className="w-7 h-7 text-white" />
+                                </div>
+                                <h2 className="text-2xl font-bold tracking-tight">Bulk Upload Complete</h2>
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <div className="bg-white/20 rounded-2xl p-4 flex flex-col items-center min-w-[70px]">
+                                    <span className="text-2xl font-bold leading-none">{bulkResults?.total}</span>
+                                    <span className="text-[10px] font-medium text-indigo-100 mt-1 uppercase tracking-wider">Total</span>
+                                </div>
+                                <div className="bg-white/20 rounded-2xl p-4 flex flex-col items-center min-w-[70px]">
+                                    <span className="text-2xl font-bold leading-none">{bulkResults?.results?.filter(r => r.success).length}</span>
+                                    <span className="text-[10px] font-medium text-indigo-100 mt-1 uppercase tracking-wider">Uploaded</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30 max-h-[340px] custom-scrollbar">
+                            <div className="space-y-3">
+                                {bulkResults.results.map((res, idx) => (
+                                    <div key={idx} className={`border rounded-3xl p-4 flex items-center justify-between ${res.success ? 'bg-emerald-50/50 border-emerald-100' : 'bg-red-50/50 border-red-100'}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center shadow-sm border ${res.success ? 'bg-white text-emerald-500 border-emerald-50' : 'bg-white text-red-400 border-red-50'}`}>
+                                                <CheckCircle className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <span className="font-bold text-slate-900 text-sm">{res.candidateName}</span>
+                                                {!res.success && res.error && <p className="text-xs text-red-500 mt-0.5">{res.error}</p>}
+                                                {res.message && <p className="text-xs text-indigo-500 mt-0.5">{res.message}</p>}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {res.driveLink && (
+                                                <a href={res.driveLink} target="_blank" rel="noopener noreferrer"
+                                                    className="bg-white hover:bg-slate-50 text-emerald-600 px-4 py-2 rounded-xl flex items-center gap-2 text-xs font-bold border border-emerald-100 shadow-sm">
+                                                    <ExternalLink className="w-3.5 h-3.5" /> Open
+                                                </a>
+                                            )}
+                                            {res.success && (
+                                                <button
+                                                    onClick={() => { setSelectedMailItem(res); setRecipientEmail(''); setMailStatus({ type: '', message: '' }); setShowMailModal(true); }}
+                                                    className="bg-white hover:bg-slate-50 text-indigo-600 px-4 py-2 rounded-xl flex items-center gap-2 text-xs font-bold border border-indigo-100 shadow-sm">
+                                                    <Mail className="w-3.5 h-3.5" /> Mail
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="p-6 pt-0 bg-slate-50/30">
+                            <button onClick={() => { setShowBulkResults(false); setBulkResults(null); }}
+                                className="w-full bg-[#1E293B] hover:bg-[#0F172A] text-white py-4 rounded-2xl text-sm font-bold transition-all shadow-xl active:scale-95">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Email Modal */}
             {
                 showMailModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-300">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
                         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20 transform animate-in zoom-in-95 duration-300">
+                            {/* Header */}
                             <div className="bg-indigo-600 px-8 py-6 text-white relative">
-                                <button onClick={() => setShowMailModal(false)} className="absolute right-6 top-6 text-white/50 hover:text-white transition-colors p-1">
+                                <button
+                                    onClick={() => { setShowMailModal(false); setSelectedMailItem(null); setRecipientEmail(''); }}
+                                    className="absolute right-6 top-6 text-white/50 hover:text-white transition-colors p-1"
+                                >
                                     <X className="w-5 h-5" />
                                 </button>
                                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
                                     <Mail className="w-6 h-6 text-white" />
                                 </div>
                                 <h2 className="text-xl font-bold">Send Notification</h2>
-                                <p className="text-indigo-100/80 text-sm mt-1">To: {formData.employeeName || 'Employee'}</p>
+                                <p className="text-indigo-100/80 text-sm mt-1">To: {selectedMailItem ? selectedMailItem.employeeName : (formData.employeeName || 'Employee')}</p>
                             </div>
 
-                            <form onSubmit={handleSendMail} className="p-8 space-y-6">
+                            <form onSubmit={handleSendMail} className="p-8 space-y-6 bg-slate-50">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Recipient Email Address</label>
                                     <input
                                         type="email"
                                         required
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 px-4 text-slate-900 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:outline-none transition-all"
+                                        className="w-full bg-white border border-slate-200 rounded-2xl py-3.5 px-4 text-slate-900 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:outline-none transition-all shadow-sm"
                                         placeholder="employee@example.com"
                                         value={recipientEmail}
                                         onChange={(e) => setRecipientEmail(e.target.value)}
@@ -718,7 +1247,7 @@ VTAB Square Pvt Ltd
                                 <button
                                     type="submit"
                                     disabled={isSending}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-2xl shadow-xl flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
+                                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-2xl shadow-xl shadow-indigo-200 flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
                                 >
                                     {isSending ? (
                                         <>

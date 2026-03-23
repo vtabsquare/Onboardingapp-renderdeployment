@@ -1,12 +1,41 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
+
+// --- Render Deployment Setup for Google Drive Credentials ---
+const CREDENTIALS_PATH = path.join(__dirname, 'oauth2-credentials.json');
+const CONFIG_DIR = path.join(__dirname, 'config');
+const TOKEN_PATH = path.join(CONFIG_DIR, 'token.json');
+
+if (process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64) {
+    fs.writeFileSync(CREDENTIALS_PATH, Buffer.from(process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64, 'base64').toString('utf-8'));
+    console.log('✅ Created oauth2-credentials.json from Environment Variable');
+}
+
+if (process.env.GOOGLE_OAUTH_TOKEN_BASE64) {
+    if (!fs.existsSync(CONFIG_DIR)) {
+        fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+    fs.writeFileSync(TOKEN_PATH, Buffer.from(process.env.GOOGLE_OAUTH_TOKEN_BASE64, 'base64').toString('utf-8'));
+    console.log('✅ Created config/token.json from Environment Variable');
+}
+// -----------------------------------------------------------
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
 const offerRoutes = require('./routes/offer');
+const policyAgreementRoutes = require('./routes/policyAgreement');
+const relievingRoutes = require('./routes/relievingExperience');
+const probationRoutes = require('./routes/probationConfirmation');
+const salaryHikeRoutes = require('./routes/salaryHike');
 
 const app = express();
+
+// Serve static files from the frontend dist folder
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 const allowedOrigins = [
     'http://localhost:5173',
@@ -49,8 +78,15 @@ bcrypt.hash('12345', 10).then(hash => console.log(hash));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/offer', offerRoutes);
+app.use('/api/policies', policyAgreementRoutes);
+app.use('/api/relieving', relievingRoutes);
+app.use('/api/probation', probationRoutes);
+app.use('/api/salary-hike', salaryHikeRoutes);
 
-app.get('/', (req, res) => res.json({ message: 'Offer Editor API running' }));
+// Catch-all route for frontend
+app.get(/^(?!\/api).+/, (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
 
 // Connect MongoDB and start server
 mongoose

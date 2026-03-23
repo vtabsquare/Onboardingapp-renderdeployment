@@ -73,7 +73,25 @@ body {
 }
 
 .animation-delay-2000 {
-  animation-delay: 2s;
+  animation-delay: 4s;
+}
+
+/* ContentEditable Stabilizer */
+[contenteditable] {
+  outline: none !important;
+  font-family: inherit !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease !important;
+}
+
+[contenteditable]:empty:before {
+  content: "\feff";
+  display: inline-block;
+  min-width: 1px;
+}
+
+/* Ensure consistent line height and box sizing */
+[contenteditable] * {
+  font-family: inherit !important;
 }
 
 .animation-delay-4000 {

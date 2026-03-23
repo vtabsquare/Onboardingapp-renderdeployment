@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FileText, FileCheck, LogOut, ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
+import { FileText, FileCheck, LogOut, ChevronLeft, ChevronRight, Menu, X, Edit3 } from 'lucide-react';
+import { useEditable } from '../context/EditableContext';
 
 const Sidebar = () => {
+    const { isEditable, toggleEditable } = useEditable();
     const navigate = useNavigate();
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
@@ -36,6 +38,26 @@ const Sidebar = () => {
                         <p className="text-[10px] text-white/50 mt-0.5">Admin Portal</p>
                     </div>
                 )}
+            </div>
+
+            {/* Edit Mode Toggle */}
+            <div className={`px-2 py-4 border-b border-white/10 ${collapsed ? 'flex justify-center' : ''}`}>
+                <button
+                    onClick={toggleEditable}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 group ${isEditable
+                        ? 'bg-amber-500 text-white shadow-lg shadow-amber-900/40'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10'
+                        } ${collapsed ? 'justify-center w-10 h-10 p-0' : ''}`}
+                    title={isEditable ? "Disable Editable Mode" : "Enable Editable Mode"}
+                >
+                    <Edit3 className={`w-5 h-5 flex-shrink-0 ${isEditable ? 'animate-pulse' : 'text-slate-400 group-hover:text-amber-400'}`} />
+                    {!collapsed && (
+                        <div className="text-left">
+                            <p className="text-[13px] font-bold leading-none">Edit Mode</p>
+                            <p className="text-[10px] opacity-60 mt-1">{isEditable ? 'Active' : 'Disabled'}</p>
+                        </div>
+                    )}
+                </button>
             </div>
 
             {/* Nav Items */}

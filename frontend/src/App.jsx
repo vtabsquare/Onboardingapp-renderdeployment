@@ -10,9 +10,12 @@ import Layout from './components/Layout';
 
 import SalaryHikeEditor from './pages/SalaryHikeEditor';
 
+import { EditableProvider } from './context/EditableContext';
+
 function App() {
   return (
-    <Router>
+    <EditableProvider>
+      <Router>
       <Routes>
         <Route path="/" element={<Login />} />
         <Route
@@ -69,6 +72,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </EditableProvider>
   );
 }
 
