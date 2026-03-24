@@ -10,6 +10,7 @@ const ProbationConfirmationEditor = () => {
     const { isEditable, customLogo, setCustomLogo, customSign, setCustomSign } = useEditable();
     const logoInputRef = useRef();
     const signInputRef = useRef();
+    const photoInputRef = useRef();
     const bulkUploadRef = useRef();
     const savedFormDataRef = useRef(null);
 
@@ -126,8 +127,8 @@ VTAB Square Pvt Ltd
             alert('Reporting Manager must contain alphabets only.');
             return false;
         }
-        if (!numericOnly.test(formData.doorNo)) {
-            alert('Door No must contain numbers only.');
+        if (!formData.doorNo) {
+            alert('Door No is required.');
             return false;
         }
         if (!alphaOnly.test(formData.district)) {
@@ -484,6 +485,13 @@ VTAB Square Pvt Ltd
             />
             <input
                 type="file"
+                ref={photoInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageUpload}
+            />
+            <input
+                type="file"
                 ref={bulkUploadRef}
                 className="hidden"
                 accept=".xlsx, .xls"
@@ -565,7 +573,6 @@ VTAB Square Pvt Ltd
                                         type="date"
                                         className={inputClass}
                                         value={formData.effectiveDate}
-                                        min={new Date().toISOString().split('T')[0]}
                                         onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
                                     />
                                 </div>
@@ -586,10 +593,11 @@ VTAB Square Pvt Ltd
                                     <input
                                         type="text"
                                         className={inputClass}
+                                        placeholder="e.g. WD02, 123, AER"
                                         value={formData.doorNo}
                                         onChange={(e) => {
                                             const value = e.target.value;
-                                            const filteredValue = value.replace(/\D/g, '');
+                                            const filteredValue = value.replace(/[^a-zA-Z0-9]/g, '');
                                             setFormData({ ...formData, doorNo: filteredValue });
                                         }}
                                     />
@@ -905,11 +913,22 @@ VTAB Square Pvt Ltd
 
                                         {/* Photo Block */}
                                         <div className="flex flex-col items-center mr-8">
-                                            <div className="w-24 h-24 bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-300">
+                                            <div
+                                                className={`w-24 h-24 bg-slate-100 flex items-center justify-center overflow-hidden border transition-colors ${
+                                                    isEditable
+                                                        ? 'border-indigo-300 cursor-pointer hover:border-indigo-500 hover:bg-indigo-50'
+                                                        : 'border-slate-300'
+                                                }`}
+                                                onClick={() => isEditable && photoInputRef.current?.click()}
+                                                title={isEditable ? 'Click to upload photo' : ''}
+                                            >
                                                 {formData.photo ? (
                                                     <img src={formData.photo} alt="Employee" className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <span className="text-[10px] text-slate-400">Photo</span>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span className="text-[10px] text-slate-400">Photo</span>
+                                                        {isEditable && <span className="text-[9px] text-indigo-400 font-medium">Click to upload</span>}
+                                                    </div>
                                                 )}
                                             </div>
                                             <div className="font-bold text-[11px] mt-2">

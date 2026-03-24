@@ -116,8 +116,8 @@ VTAB Square Pvt Ltd
             alert('Employee Name must contain alphabets only.');
             return false;
         }
-        if (!numericOnly.test(formData.doorNo)) {
-            alert('Door No must contain numbers only.');
+        if (!formData.doorNo) {
+            alert('Door No is required.');
             return false;
         }
         if (!alphaOnly.test(formData.district)) {
@@ -541,7 +541,6 @@ VTAB Square Pvt Ltd
                                         type="date"
                                         className={inputClass}
                                         value={formData.date}
-                                        min={new Date().toISOString().split('T')[0]}
                                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                                     />
                                 </div>
@@ -561,24 +560,21 @@ VTAB Square Pvt Ltd
                                 </div>
                                 <div>
                                     <label className={labelClass}>Employee Photo</label>
-                                    <div className="mt-1 flex items-center gap-4">
-                                        <button
-                                            onClick={() => photoInputRef.current.click()}
-                                            className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-all"
-                                        >
-                                            <Upload className="w-3.5 h-3.5" />
-                                            Upload Photo
-                                        </button>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-16 rounded-xl border border-slate-200 overflow-hidden flex items-center justify-center bg-slate-50">
+                                            {formData.photo ? (
+                                                <img src={formData.photo} alt="Employee" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <User className="w-6 h-6 text-slate-300" />
+                                            )}
+                                        </div>
                                         <input
                                             ref={photoInputRef}
                                             type="file"
-                                            className="hidden"
                                             accept="image/*"
                                             onChange={handlePhotoUpload}
+                                            className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
                                         />
-                                        {formData.photo && (
-                                            <img src={formData.photo} alt="Preview" className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
-                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -598,10 +594,11 @@ VTAB Square Pvt Ltd
                                     <input
                                         type="text"
                                         className={inputClass}
+                                        placeholder="e.g. WD02, 123, AER"
                                         value={formData.doorNo}
                                         onChange={(e) => {
                                             const value = e.target.value;
-                                            const filteredValue = value.replace(/\D/g, '');
+                                            const filteredValue = value.replace(/[^a-zA-Z0-9]/g, '');
                                             setFormData({ ...formData, doorNo: filteredValue });
                                         }}
                                     />
@@ -704,7 +701,6 @@ VTAB Square Pvt Ltd
                                         type="date"
                                         className={inputClass}
                                         value={formData.effectiveDate}
-                                        min={new Date().toISOString().split('T')[0]}
                                         onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
                                     />
                                 </div>
@@ -886,11 +882,22 @@ VTAB Square Pvt Ltd
 
                                 <div className="flex-1 px-16 pt-12 pb-12 text-black font-sans relative">
                                     {/* Photo Area */}
-                                    <div className="absolute right-16 top-16 w-32 h-40 border-2 border-slate-200 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center">
+                                    <div
+                                        className={`absolute right-16 top-16 w-32 h-40 border-2 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center transition-colors ${
+                                            isEditable
+                                                ? 'border-indigo-300 cursor-pointer hover:border-indigo-500 hover:bg-indigo-50'
+                                                : 'border-slate-200'
+                                        }`}
+                                        onClick={() => isEditable && photoInputRef.current.click()}
+                                        title={isEditable ? 'Click to upload photo' : ''}
+                                    >
                                         {formData.photo ? (
                                             <img src={formData.photo} alt="Employee" className="w-full h-full object-cover" />
                                         ) : (
-                                            <User className="w-12 h-12 text-slate-300" />
+                                            <div className="flex flex-col items-center gap-1">
+                                                <User className="w-10 h-10 text-slate-300" />
+                                                {isEditable && <span className="text-[9px] text-indigo-400 font-medium">Click to upload</span>}
+                                            </div>
                                         )}
                                     </div>
 

@@ -84,8 +84,8 @@ const OfferEditor = () => {
             alert('Candidate Name must contain alphabets only.');
             return false;
         }
-        if (!numericOnly.test(formData.doorNo)) {
-            alert('Door No must contain numbers only.');
+        if (!formData.doorNo) {
+            alert('Door No is required.');
             return false;
         }
         if (!alphaOnly.test(formData.district)) {
@@ -624,7 +624,6 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
                                         type="date"
                                         className={inputClass}
                                         value={formData.date}
-                                        min={new Date().toISOString().split('T')[0]}
                                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                                     />
                                 </div>
@@ -659,10 +658,11 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
                                     <input
                                         type="text"
                                         className={inputClass}
+                                        placeholder="e.g. WD02, 123, AER"
                                         value={formData.doorNo}
                                         onChange={(e) => {
                                             const value = e.target.value;
-                                            const filteredValue = value.replace(/\D/g, '');
+                                            const filteredValue = value.replace(/[^a-zA-Z0-9]/g, '');
                                             setFormData({ ...formData, doorNo: filteredValue });
                                         }}
                                     />
@@ -762,7 +762,6 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
                                     <input
                                         type="date"
                                         className={inputClass}
-                                        min={new Date().toISOString().split('T')[0]}
                                         value={formData.joiningDate}
                                         onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
                                     />

@@ -10,6 +10,7 @@ const PolicyAgreement = () => {
     const { isEditable, customLogo, setCustomLogo, customSign, setCustomSign } = useEditable();
     const logoInputRef = useRef();
     const signInputRef = useRef();
+    const photoInputRef = useRef();
 
     const handleImageUpload = (e, setter) => {
         const file = e.target.files[0];
@@ -19,6 +20,43 @@ const PolicyAgreement = () => {
                 setter(reader.result);
             };
             reader.readAsDataURL(file);
+        }
+    };
+
+    const handlePhotoUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => setFormData(prev => ({ ...prev, photo: reader.result }));
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const loadPhotoFromUrl = async (url) => {
+        if (!url) return null;
+        try {
+            const driveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (!driveMatch) return null;
+            const fileId = driveMatch[1];
+            const directUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
+            const res = await fetch(directUrl);
+            if (!res.ok) {
+                console.warn('Photo fetch failed, status:', res.status);
+                return null;
+            }
+            const blob = await res.blob();
+            if (!blob || blob.size === 0) {
+                console.warn('Photo blob is empty for:', url);
+                return null;
+            }
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+        } catch (err) {
+            console.error('Failed to load photo:', err.message);
+            return null;
         }
     };
     const [formData, setFormData] = useState({
@@ -33,7 +71,8 @@ const PolicyAgreement = () => {
         trainingMonths: 2,
         probationMonths: 4,
         postProbationMonths: 2,
-        employeeType: 'Internship'
+        employeeType: 'Internship',
+        photo: null
     });
     const [showMailModal, setShowMailModal] = useState(false);
     const [recipientEmail, setRecipientEmail] = useState('');
@@ -138,7 +177,8 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
             'Training',
             'Probation',
             'Post-Probation',
-            'Employee Type'
+            'Employee Type',
+            'Employee Photo URL'
         ];
         const sampleRow = [
             'Sanjay S',
@@ -151,7 +191,8 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
             '2',
             '4',
             '2',
-            'Internship'
+            'Internship',
+            'https://drive.google.com/file/d/.../view'
         ];
         const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
         ws['!cols'] = headers.map(() => ({ wch: 20 }));
@@ -224,6 +265,7 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
                 probationMonths: col('Probation'),
                 postProbationMonths: col('Post-Probation'),
                 employeeType: col('Employee Type'),
+                photoUrl: col('Employee Photo URL'),
             };
 
             const dataRows = rows.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== ''));
@@ -244,6 +286,9 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
                 const candidateName = getCellStr(colMap.candidateName);
                 if (!candidateName) continue;
 
+                const photoUrl = getCellStr(colMap.photoUrl);
+                const photoBase64 = photoUrl ? await loadPhotoFromUrl(photoUrl) : null;
+
                 const rowData = {
                     candidateName,
                     stipend: getCellStr(colMap.stipend),
@@ -256,11 +301,12 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
                     probationMonths: getCellStr(colMap.probationMonths),
                     postProbationMonths: getCellStr(colMap.postProbationMonths),
                     date: new Date().toISOString().split('T')[0],
-                    employeeType: getCellStr(colMap.employeeType) || 'Internship'
+                    employeeType: getCellStr(colMap.employeeType) || 'Internship',
+                    photo: photoBase64
                 };
 
                 setFormData(rowData);
-                await new Promise(r => setTimeout(r, 400));
+                await new Promise(r => setTimeout(r, 800));
                 const pdfDataUri = await capturePreviewAsPdfBase64();
 
                 if (pdfDataUri) {
@@ -482,6 +528,13 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                 accept=".xlsx, .xls"
                 onChange={handleBulkUpload}
             />
+            <input
+                type="file"
+                ref={photoInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+            />
 
             {/* Header */}
             <header className="bg-white border-b border-slate-100 px-4 md:px-8 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
@@ -532,6 +585,24 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                                             setFormData({ ...formData, candidateName: filteredValue });
                                         }}
                                     />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Employee Photo</label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-16 rounded-xl border border-slate-200 overflow-hidden flex items-center justify-center bg-slate-50">
+                                            {formData.photo ? (
+                                                <img src={formData.photo} alt="Candidate" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <User className="w-6 h-6 text-slate-300" />
+                                            )}
+                                        </div>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handlePhotoUpload}
+                                            className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
                                     <label className={labelClass}>Employee Type <span className="text-red-500">*</span></label>
@@ -841,28 +912,43 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                                     </div>
                                 </div>
 
-                                <div className="px-16 py-10 flex-1 text-gray-900">
+                                <div className="px-16 py-6 flex-1 text-gray-900">
                                     <h2
-                                        className={`text-center font-bold text-lg mb-10 ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                        className={`text-center font-bold text-lg mb-6 ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
                                         contentEditable={isEditable}
                                         suppressContentEditableWarning={true}
                                     >
                                         Policy Agreement Document
                                     </h2>
 
-                                    <div className="flex justify-end mb-6">
-                                        <div style={{ width: '80px', height: '90px', border: '1px solid #999' }} className="flex items-end justify-center pb-1">
-                                            <span style={{ fontSize: '9px', color: '#999' }}>Photo</span>
+                                    <div className="flex justify-between items-start mb-4">
+                                        {/* Dear + name */}
+                                        <p
+                                            className={`font-semibold text-sm uppercase ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
+                                            contentEditable={isEditable}
+                                            suppressContentEditableWarning={true}
+                                        >
+                                            Dear {formData.candidateName || 'SANJAY S'},
+                                        </p>
+
+                                        {/* Photo */}
+                                        <div
+                                            style={{ width: '80px', height: '90px', border: isEditable ? '1.5px solid #818cf8' : '1px solid #999', flexShrink: 0 }}
+                                            className={`flex items-center justify-center overflow-hidden transition-colors ${
+                                                isEditable ? 'cursor-pointer hover:bg-indigo-50' : ''
+                                            }`}
+                                            onClick={() => isEditable && photoInputRef.current.click()}
+                                            title={isEditable ? 'Click to upload photo' : ''}
+                                        >
+                                            {formData.photo ? (
+                                                <img src={formData.photo} alt="Candidate" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span style={{ fontSize: '9px', color: '#999' }}>
+                                                    {isEditable ? 'Click to upload' : 'Photo'}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
-
-                                    <p
-                                        className={`font-semibold text-sm mb-8 uppercase ${isEditable ? 'outline-none hover:bg-indigo-50/50 focus:bg-indigo-50' : ''}`}
-                                        contentEditable={isEditable}
-                                        suppressContentEditableWarning={true}
-                                    >
-                                        Dear {formData.candidateName || 'SANJAY S'},
-                                    </p>
 
                                     <div className="space-y-4 text-[11px] leading-relaxed">
                                         <div className="flex gap-4">
@@ -980,12 +1066,18 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                                         US: (844) 708-0008<br />
                                         IND: (996) 258-7975
                                     </div>
-                                    <div className="flex flex-col items-center">
-                                        <div className="mb-2 bg-white rounded p-2 w-14 h-14 flex items-center justify-center">
-                                            <img src="/vtab.jpg" alt="VTAB" className="w-10 h-10 object-contain" />
-                                        </div>
-                                        <div className="text-[9px] font-bold tracking-widest uppercase">NOW PART OF</div>
-                                        <img src="/siroco.jpeg" alt="SIROCO" className="h-7 object-contain" />
+                                    <div className={`flex flex-col items-center justify-center ${isEditable ? 'cursor-pointer hover:bg-white/10 transition-all' : ''}`} onClick={() => isEditable && logoInputRef.current.click()}>
+                                        {customLogo ? (
+                                            <img src={customLogo} alt="Custom Logo" className="max-h-20 w-auto object-contain" />
+                                        ) : (
+                                            <>
+                                                <div className="mb-2 bg-white p-2 w-14 h-14 flex items-center justify-center">
+                                                    <img src="/vtab.jpg" alt="VTAB" className="w-10 h-10 object-contain" />
+                                                </div>
+                                                <div className="text-[9px] font-bold tracking-widest uppercase text-white opacity-80">NOW PART OF</div>
+                                                <img src="/siroco.jpeg" alt="SIROCO" className="h-7 object-contain" />
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1150,7 +1242,7 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                                 </div>
 
                                 <div className="bg-[#0A2458] p-4 flex justify-between items-center text-white mt-12">
-                                    <img src="/siroco.jpeg" alt="SIROCO" className="h-6 object-contain" />
+                                    <img src={customLogo || "/siroco.jpeg"} alt="SIROCO" className="h-6 object-contain" />
                                     <span className="font-bold">4</span>
                                 </div>
                             </div>
