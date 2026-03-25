@@ -1212,67 +1212,64 @@ VTAB Square Pvt Ltd
             )}
 
             {/* Email Modal */}
-            {
-                showMailModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20 transform animate-in zoom-in-95 duration-300">
-                            {/* Header */}
-                            <div className="bg-indigo-600 px-8 py-6 text-white relative">
-                                <button
-                                    onClick={() => { setShowMailModal(false); setSelectedMailItem(null); setRecipientEmail(''); }}
-                                    className="absolute right-6 top-6 text-white/50 hover:text-white transition-colors p-1"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
-                                    <Mail className="w-6 h-6 text-white" />
-                                </div>
-                                <h2 className="text-xl font-bold">Send Notification</h2>
-                                <p className="text-indigo-100/80 text-sm mt-1">To: {selectedMailItem ? selectedMailItem.employeeName : (formData.employeeName || 'Employee')}</p>
+            {showMailModal && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden transform animate-in zoom-in-95 duration-300">
+                        <div className="bg-indigo-600 px-8 py-8 text-white relative">
+                            <button onClick={() => { setShowMailModal(false); setSelectedMailItem(null); setRecipientEmail(''); }} className="absolute right-6 top-6 text-white/50 hover:text-white transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-6 backdrop-blur-md">
+                                <Mail className="w-6 h-6 text-white" />
                             </div>
-
-                            <form onSubmit={handleSendMail} className="p-8 space-y-6 bg-slate-50">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Recipient Email Address</label>
+                            <h2 className="text-2xl font-bold tracking-tight">Send Notification</h2>
+                            <p className="text-indigo-100 text-xs mt-1 font-medium italic">
+                                To: {selectedMailItem ? selectedMailItem.employeeName : (formData.employeeName || 'Employee')}
+                            </p>
+                        </div>
+                        <form onSubmit={handleSendMail} className="p-8 space-y-6 bg-white">
+                            <div>
+                                <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-widest mb-3 ml-1">Recipient Email Address</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-indigo-400">
+                                        <Mail className="w-4 h-4" />
+                                    </div>
                                     <input
-                                        type="email"
-                                        required
-                                        className="w-full bg-white border border-slate-200 rounded-2xl py-3.5 px-4 text-slate-900 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:outline-none transition-all shadow-sm"
+                                        type="email" required
+                                        className="w-full bg-[#EEF2FF] border-none rounded-2xl py-4 pl-12 pr-4 text-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all placeholder:text-indigo-300 font-medium"
                                         placeholder="employee@example.com"
                                         value={recipientEmail}
                                         onChange={(e) => setRecipientEmail(e.target.value)}
                                     />
                                 </div>
-
-                                {mailStatus.message && (
-                                    <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-2 duration-300 ${mailStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                                        <div className={`w-2 h-2 rounded-full ${mailStatus.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`}></div>
-                                        <p className="text-sm font-semibold">{mailStatus.message}</p>
-                                    </div>
+                            </div>
+                            {mailStatus.message && (
+                                <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-2 duration-300 ${mailStatus.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                                    <div className={`w-2 h-2 rounded-full ${mailStatus.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`}></div>
+                                    <p className="text-sm font-semibold">{mailStatus.message}</p>
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={isSending}
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-2xl shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-[0.98] group"
+                            >
+                                {isSending ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <span>Sending...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                        <span>Send Official Email</span>
+                                    </>
                                 )}
-
-                                <button
-                                    type="submit"
-                                    disabled={isSending}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-2xl shadow-xl shadow-indigo-200 flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
-                                >
-                                    {isSending ? (
-                                        <>
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                            <span>Sending...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Send className="w-4 h-4" />
-                                            <span>Send Official Email</span>
-                                        </>
-                                    )}
-                                </button>
-                            </form>
-                        </div>
+                            </button>
+                        </form>
                     </div>
-                )
-            }
+                </div>
+            )}
         </div >
     );
 };
