@@ -35,7 +35,7 @@ const salaryHikeRoutes = require('./routes/salaryHike');
 const app = express();
 
 // Serve static files from the frontend dist folder
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
+// app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 const allowedOrigins = [
     'http://localhost:5173',
@@ -93,9 +93,9 @@ app.get('/', (req, res) => {
 });
 
 // Catch-all route for frontend
-app.get(/^(?!\/api).+/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
-});
+// app.get(/^(?!\/api).+/, (req, res) => {
+//     res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+// });
 
 // Connect MongoDB and start server
 mongoose
