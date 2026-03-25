@@ -100,12 +100,14 @@ const Sidebar = () => {
     return (
         <>
             {/* Mobile: Hamburger button (top-left, shown only on mobile) */}
-            <button
-                className="lg:hidden fixed top-3 left-3 z-[200] bg-[#0A2458] text-white p-2 rounded-xl shadow-lg"
-                onClick={() => setMobileOpen(true)}
-            >
-                <Menu className="w-5 h-5" />
-            </button>
+            {!mobileOpen && (
+                <button
+                    className="lg:hidden fixed top-3 left-3 z-[200] bg-[#0A2458] text-white p-2 rounded-xl shadow-lg"
+                    onClick={() => setMobileOpen(true)}
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
+            )}
 
             {/* Mobile: Overlay */}
             {mobileOpen && (
