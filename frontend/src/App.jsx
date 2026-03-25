@@ -7,6 +7,7 @@ import RelievingExperienceEditor from './pages/RelievingExperienceEditor';
 import ProbationConfirmationEditor from './pages/ProbationConfirmationEditor';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import SalaryHikeEditor from './pages/SalaryHikeEditor';
 
@@ -14,8 +15,9 @@ import { EditableProvider } from './context/EditableContext';
 
 function App() {
   return (
-    <EditableProvider>
-      <Router>
+    <ErrorBoundary>
+      <EditableProvider>
+        <Router>
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
@@ -69,11 +71,11 @@ function App() {
             </ProtectedRoute>
           }
         />
-        {/* Redirect any other path to / */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
     </EditableProvider>
+    </ErrorBoundary>
   );
 }
 

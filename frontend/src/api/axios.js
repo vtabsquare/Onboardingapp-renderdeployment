@@ -6,7 +6,7 @@ const API = axios.create({
         : 'http://localhost:5000/api',
 });
 
-// Add a request interceptor to attach the token
+// Attach the token to every request
 API.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -14,5 +14,18 @@ API.interceptors.request.use((config) => {
     }
     return config;
 });
+
+// Handle 401 (expired/invalid token) — clear session and redirect to login
+API.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default API;
