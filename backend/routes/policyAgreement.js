@@ -129,7 +129,7 @@ router.post('/bulk-upload', protect, async (req, res) => {
                 }
 
                 if (existingAgreement) {
-                    const isDuplicate = 
+                    const isDuplicate =
                         String(existingAgreement.stipend || '') === String(candidate.stipend || '') &&
                         String(existingAgreement.probationSalary || '') === String(candidate.probationSalary || '') &&
                         String(existingAgreement.postProbationSalary || '') === String(candidate.postProbationSalary || '') &&
@@ -174,6 +174,12 @@ router.post('/send-email', protect, async (req, res) => {
     try {
         const { toEmail, candidateName, pdfBase64, customFileName, customSubject, customMailContent } = req.body;
         if (!toEmail || !candidateName || !pdfBase64) return res.status(400).json({ message: 'Missing fields' });
+
+        // Validate email format and prevent multiple emails (header/CC injection)
+        const emailRegex = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+        if (!emailRegex.test(toEmail)) {
+            return res.status(400).json({ message: 'Invalid email format. Only a single email address is allowed.' });
+        }
 
         const base64Content = pdfBase64.includes('base64,') ? pdfBase64.split('base64,')[1] : pdfBase64;
 

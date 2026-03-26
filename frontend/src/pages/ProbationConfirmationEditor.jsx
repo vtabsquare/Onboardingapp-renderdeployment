@@ -208,10 +208,10 @@ VTAB Square Pvt Ltd
             const driveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
             if (!driveMatch) return null;
             const fileId = driveMatch[1];
-            
+
             // Use Google's lh3 image hosting which allows CORS for public files
             const directUrl = `https://lh3.googleusercontent.com/d/${fileId}`;
-            
+
             const res = await fetch(directUrl);
             const blob = await res.blob();
             return new Promise((resolve) => {
@@ -914,11 +914,10 @@ VTAB Square Pvt Ltd
                                         {/* Photo Block */}
                                         <div className="flex flex-col items-center mr-8">
                                             <div
-                                                className={`w-24 h-24 bg-slate-100 flex items-center justify-center overflow-hidden border transition-colors ${
-                                                    isEditable
+                                                className={`w-24 h-24 bg-slate-100 flex items-center justify-center overflow-hidden border transition-colors ${isEditable
                                                         ? 'border-indigo-300 cursor-pointer hover:border-indigo-500 hover:bg-indigo-50'
                                                         : 'border-slate-300'
-                                                }`}
+                                                    }`}
                                                 onClick={() => isEditable && photoInputRef.current?.click()}
                                                 title={isEditable ? 'Click to upload photo' : ''}
                                             >

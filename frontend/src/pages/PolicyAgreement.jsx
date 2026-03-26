@@ -934,9 +934,8 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                                         {/* Photo */}
                                         <div
                                             style={{ width: '80px', height: '90px', border: isEditable ? '1.5px solid #818cf8' : '1px solid #999', flexShrink: 0 }}
-                                            className={`flex items-center justify-center overflow-hidden transition-colors ${
-                                                isEditable ? 'cursor-pointer hover:bg-indigo-50' : ''
-                                            }`}
+                                            className={`flex items-center justify-center overflow-hidden transition-colors ${isEditable ? 'cursor-pointer hover:bg-indigo-50' : ''
+                                                }`}
                                             onClick={() => isEditable && photoInputRef.current.click()}
                                             title={isEditable ? 'Click to upload photo' : ''}
                                         >
@@ -1264,7 +1263,7 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg flex flex-col overflow-hidden border border-white/20 transform animate-in zoom-in-95 duration-300">
                         {/* Modal Header */}
                         <div className="bg-indigo-600 px-8 py-10 text-white relative">
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowBulkResults(false);
                                     setBulkResults(null);
@@ -1279,7 +1278,7 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                                 </div>
                                 <h2 className="text-2xl font-bold tracking-tight">Bulk Upload Complete</h2>
                             </div>
-                            
+
                             <div className="flex gap-3 mt-6">
                                 <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center justify-center min-w-[70px]">
                                     <span className="text-2xl font-bold leading-none">{bulkResults?.total}</span>
@@ -1310,9 +1309,9 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
 
                                         <div className="flex gap-2">
                                             {res.driveLink && (
-                                                <a 
-                                                    href={res.driveLink} 
-                                                    target="_blank" 
+                                                <a
+                                                    href={res.driveLink}
+                                                    target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="bg-white hover:bg-slate-50 text-emerald-600 px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all border border-emerald-100 shadow-sm"
                                                 >
@@ -1321,7 +1320,7 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
                                                 </a>
                                             )}
                                             {res.success && (
-                                                <button 
+                                                <button
                                                     onClick={() => {
                                                         setSelectedMailItem(res);
                                                         setRecipientEmail('');
@@ -1341,7 +1340,7 @@ VTAB Square Pvt Ltd (Now Part of Siroco)` : coverLetter,
 
                         {/* Modal Footer */}
                         <div className="p-6 pt-0 bg-slate-50/30">
-                            <button 
+                            <button
                                 onClick={() => {
                                     setShowBulkResults(false);
                                     setBulkResults(null);

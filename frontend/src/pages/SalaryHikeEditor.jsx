@@ -214,7 +214,7 @@ VTAB Square Pvt Ltd
             const ws = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
             if (rows.length < 2) { alert('No data rows found.'); setIsBulkProcessing(false); return; }
-            
+
             const hdr = rows[0].map(h => String(h || '').trim());
             const col = (name) => hdr.findIndex(h => h.toLowerCase() === name.toLowerCase());
             const colMap = {
@@ -243,10 +243,10 @@ VTAB Square Pvt Ltd
                 const get = (idx) => idx >= 0 && row[idx] !== undefined ? String(row[idx]).trim() : '';
                 const employeeName = get(colMap.employeeName);
                 if (!employeeName) continue;
-                
+
                 const photoUrl = get(colMap.photoUrl);
                 const photoBase64 = photoUrl ? await loadPhotoFromUrl(photoUrl) : null;
-                
+
                 const rowData = {
                     date: get(colMap.date) || new Date().toISOString().split('T')[0],
                     employeeName,
@@ -264,7 +264,7 @@ VTAB Square Pvt Ltd
 
                 setFormData(rowData);
                 await new Promise(r => setTimeout(r, 500));
-                
+
                 const pdfDataUri = await capturePreviewAsPdfBase64();
                 if (pdfDataUri) {
                     candidatesArr.push({
@@ -389,7 +389,7 @@ VTAB Square Pvt Ltd
 
     const handleSendMail = async (e) => {
         e.preventDefault();
-        
+
         let pdfDataUri = null;
         let candidateName = '';
         let customFileName = '';
@@ -525,7 +525,7 @@ VTAB Square Pvt Ltd
                 {/* Editor Panel */}
                 <div className="w-full md:w-[340px] lg:w-[400px] bg-white border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto p-5 md:p-8 custom-scrollbar shadow-sm z-40 flex-shrink-0">
                     <div className="space-y-10">
-                        
+
                         {/* Basic Info */}
                         <section>
                             <div className="flex items-center gap-3 mb-6">
@@ -883,11 +883,10 @@ VTAB Square Pvt Ltd
                                 <div className="flex-1 px-16 pt-12 pb-12 text-black font-sans relative">
                                     {/* Photo Area */}
                                     <div
-                                        className={`absolute right-16 top-16 w-32 h-40 border-2 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center transition-colors ${
-                                            isEditable
+                                        className={`absolute right-16 top-16 w-32 h-40 border-2 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center transition-colors ${isEditable
                                                 ? 'border-indigo-300 cursor-pointer hover:border-indigo-500 hover:bg-indigo-50'
                                                 : 'border-slate-200'
-                                        }`}
+                                            }`}
                                         onClick={() => isEditable && photoInputRef.current.click()}
                                         title={isEditable ? 'Click to upload photo' : ''}
                                     >
