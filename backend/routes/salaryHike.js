@@ -92,6 +92,19 @@ router.post('/bulk-upload', protect, async (req, res) => {
 
         for (const candidate of candidates) {
             try {
+                // Validate Base64 PDF data
+                const base64Str = candidate.pdfBase64 || '';
+                const base64Data = base64Str.includes('base64,') ? base64Str.split('base64,')[1] : base64Str;
+                const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+                
+                if (!base64Data || !base64Regex.test(base64Data)) {
+                    results.push({
+                        candidateName: candidate.candidateName || candidate.employeeName || 'Unknown',
+                        success: false,
+                        error: 'Invalid base64 data'
+                    });
+                    continue;
+                }
                 const safeName = candidate.employeeName
                     .replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
                 const fileName = `${safeName}_SalaryHikeEditor.pdf`;
