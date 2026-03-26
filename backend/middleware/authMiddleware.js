@@ -4,7 +4,7 @@ const protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer '))
-    return res.status(401).json({ message: 'Not authorized' });
+    return res.status(401).json({ error: 'Not authorized, no token' });
 
   try {
     const token = authHeader.split(' ')[1];
@@ -12,7 +12,10 @@ const protect = (req, res, next) => {
     req.admin = decoded;
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Token invalid' });
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    return res.status(401).json({ error: 'Not authorized, token failed' });
   }
 };
 
