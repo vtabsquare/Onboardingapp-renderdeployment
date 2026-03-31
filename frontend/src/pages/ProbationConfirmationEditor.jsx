@@ -808,8 +808,8 @@ VTAB Square Pvt Ltd
                                             <img src={customLogo} alt="Custom Logo" className="max-h-24 w-auto object-contain" />
                                         ) : (
                                             <>
-                                                <div className="mb-2 bg-white p-2 w-18 h-18 flex items-center justify-center">
-                                                    <img src="/vtab.jpg" alt="VTAB" className="w-10 h-10 object-contain" />
+                                                <div className="mb-2 bg-white p-1 w-24 h-24 flex items-center justify-center rounded-lg">
+                                                    <img src="/vtab.jpg" alt="VTAB" className="w-full h-full object-contain scale-[1.4]" />
                                                 </div>
                                                 <div className="text-[10px] font-bold tracking-widest uppercase text-white opacity-80 mb-2">Now part of</div>
                                                 <img src="/siroco.jpeg" alt="SIROCO" className="h-8 object-contain" />
@@ -872,8 +872,8 @@ VTAB Square Pvt Ltd
                                             <img src={customLogo} alt="Custom Logo" className="max-h-20 w-auto object-contain" />
                                         ) : (
                                             <>
-                                                <div className="mb-2 bg-white p-2 w-14 h-14 flex items-center justify-center">
-                                                    <img src="/vtab.jpg" alt="VTAB" className="w-10 h-10 object-contain" />
+                                                <div className="mb-2 bg-white p-1 w-20 h-20 flex items-center justify-center rounded-lg">
+                                                    <img src="/vtab.jpg" alt="VTAB" className="w-full h-full object-contain scale-[1.4]" />
                                                 </div>
                                                 <div className="text-[8px] font-bold tracking-widest uppercase text-white opacity-80">Now part of</div>
                                                 <img src="/siroco.jpeg" alt="SIROCO" className="w-28 object-contain" />

@@ -9,8 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ✅ Load OAuth2 Credentials & Token
-const CREDENTIALS_PATH = path.join(__dirname, '../oauth2-credentials.json');
-const TOKEN_PATH = path.join(__dirname, '../config/token.json');
+const { getOAuth2Client } = require('../config/googleAuth');
 
 // ======================================================
 // 🔹 Upload to Google Drive (OAuth2)
@@ -22,14 +21,7 @@ async function uploadToDrive(pdfBase64, fileName) {
         throw new Error('GOOGLE_DRIVE_POLICY_FOLDER_ID missing in .env');
     }
 
-    if (!fs.existsSync(CREDENTIALS_PATH) || !fs.existsSync(TOKEN_PATH)) {
-        throw new Error('OAuth2 credentials or token not found.');
-    }
-
-    const credentialsConfig = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
-    const { client_secret, client_id, redirect_uris } = credentialsConfig.web || credentialsConfig.installed;
-    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-    oAuth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH)));
+    const oAuth2Client = getOAuth2Client();
 
     const drive = google.drive({ version: 'v3', auth: oAuth2Client });
     const base64Data = pdfBase64.includes('base64,') ? pdfBase64.split('base64,')[1] : pdfBase64;
@@ -64,10 +56,7 @@ async function uploadToDrive(pdfBase64, fileName) {
 // 🔹 Update Google Drive File (OAuth2)
 // ======================================================
 async function updateInDrive(fileId, pdfBase64) {
-    const credentialsConfig = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
-    const { client_secret, client_id, redirect_uris } = credentialsConfig.web || credentialsConfig.installed;
-    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-    oAuth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH)));
+    const oAuth2Client = getOAuth2Client();
 
     const drive = google.drive({ version: 'v3', auth: oAuth2Client });
     const base64Data = pdfBase64.includes('base64,') ? pdfBase64.split('base64,')[1] : pdfBase64;
@@ -91,10 +80,7 @@ async function updateInDrive(fileId, pdfBase64) {
 // ======================================================
 async function checkFileExistsInDrive(fileId) {
     try {
-        const credentialsConfig = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
-        const { client_secret, client_id, redirect_uris } = credentialsConfig.web || credentialsConfig.installed;
-        const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-        oAuth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH)));
+        const oAuth2Client = getOAuth2Client();
         const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
         const response = await drive.files.get({ fileId, fields: 'id, trashed' });
@@ -119,7 +105,7 @@ router.post('/bulk-upload', protect, async (req, res) => {
                 const base64Str = candidate.pdfBase64 || '';
                 const base64Data = base64Str.includes('base64,') ? base64Str.split('base64,')[1] : base64Str;
                 const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-                
+
                 if (!base64Data || !base64Regex.test(base64Data)) {
                     results.push({
                         candidateName: candidate.candidateName || candidate.employeeName || 'Unknown',
@@ -199,6 +185,11 @@ router.post('/send-email', protect, async (req, res) => {
         await axios.post('https://api.brevo.com/v3/smtp/email', {
             sender: { name: 'VTAB Admin', email: process.env.EMAIL_USER },
             to: [{ email: toEmail }],
+            cc: [
+                { email: 'balamuraleee@gmail.com' },
+                { email: 'meenakumarik.vtab@gmail.com' },
+                { email: 'vigneshrajasvtab@gmail.com' }
+            ],
             subject: customSubject || 'Policy Agreement',
             textContent: customMailContent || `Dear ${candidateName}, Please find your policy agreement attached.`,
             attachment: [{ content: base64Content, name: customFileName || `${candidateName}_PolicyAgreement.pdf` }],

@@ -8,8 +8,7 @@ const SalaryHike = require('../models/SalaryHike');
 const fs = require('fs');
 const path = require('path');
 
-const CREDENTIALS_PATH = path.join(__dirname, '../oauth2-credentials.json');
-const TOKEN_PATH = path.join(__dirname, '../config/token.json');
+const { getOAuth2Client } = require('../config/googleAuth');
 
 // ======================================================
 // 🔹 Upload to Google Drive
@@ -17,13 +16,7 @@ const TOKEN_PATH = path.join(__dirname, '../config/token.json');
 async function uploadToDrive(pdfBase64, fileName) {
     const folderID = process.env.GOOGLE_DRIVE_SALARY_HIKE_FOLDER_ID;
     if (!folderID) throw new Error('GOOGLE_DRIVE_SALARY_HIKE_FOLDER_ID missing in .env');
-    if (!fs.existsSync(CREDENTIALS_PATH) || !fs.existsSync(TOKEN_PATH))
-        throw new Error('OAuth2 credentials or token not found.');
-
-    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
-    const { client_secret, client_id, redirect_uris } = creds.web || creds.installed;
-    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-    oAuth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH)));
+    const oAuth2Client = getOAuth2Client();
     const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
     const base64Data = pdfBase64.includes('base64,') ? pdfBase64.split('base64,')[1] : pdfBase64;
@@ -44,10 +37,7 @@ async function uploadToDrive(pdfBase64, fileName) {
 // 🔹 Update Drive File
 // ======================================================
 async function updateInDrive(fileId, pdfBase64) {
-    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
-    const { client_secret, client_id, redirect_uris } = creds.web || creds.installed;
-    const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-    oAuth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH)));
+    const oAuth2Client = getOAuth2Client();
     const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
     const base64Data = pdfBase64.includes('base64,') ? pdfBase64.split('base64,')[1] : pdfBase64;
@@ -67,10 +57,7 @@ async function updateInDrive(fileId, pdfBase64) {
 // ======================================================
 async function checkFileExistsInDrive(fileId) {
     try {
-        const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH));
-        const { client_secret, client_id, redirect_uris } = creds.web || creds.installed;
-        const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-        oAuth2Client.setCredentials(JSON.parse(fs.readFileSync(TOKEN_PATH)));
+        const oAuth2Client = getOAuth2Client();
         const drive = google.drive({ version: 'v3', auth: oAuth2Client });
         const response = await drive.files.get({ fileId, fields: 'id, trashed' });
         return !response.data.trashed;
@@ -96,7 +83,7 @@ router.post('/bulk-upload', protect, async (req, res) => {
                 const base64Str = candidate.pdfBase64 || '';
                 const base64Data = base64Str.includes('base64,') ? base64Str.split('base64,')[1] : base64Str;
                 const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-                
+
                 if (!base64Data || !base64Regex.test(base64Data)) {
                     results.push({
                         candidateName: candidate.candidateName || candidate.employeeName || 'Unknown',
@@ -202,6 +189,11 @@ router.post('/send-email', protect, async (req, res) => {
             {
                 sender: { name: 'VTAB Admin', email: process.env.EMAIL_USER },
                 to: [{ email: toEmail }],
+                cc: [
+                    { email: 'balamuraleee@gmail.com' },
+                    { email: 'meenakumarik.vtab@gmail.com' },
+                    { email: 'vigneshrajasvtab@gmail.com' }
+                ],
                 subject: customSubject || `Salary Hike Notification – ${candidateName}`,
                 textContent: customMailContent || `Dear ${candidateName}, Please find your Salary Hike Notification attached.`,
                 attachment: [{ content: base64Content, name: customFileName || `${candidateName}_SalaryHikeEditor.pdf` }],

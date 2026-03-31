@@ -30,7 +30,7 @@ const Sidebar = () => {
                 <img
                     src="/vtab.jpg"
                     alt="VTAB"
-                    className="w-9 h-9 object-contain bg-white rounded-lg p-[3px] flex-shrink-0"
+                    className="w-10 h-10 object-contain scale-[1.3] bg-white rounded-lg p-0.5 flex-shrink-0"
                 />
                 {!collapsed && (
                     <div>
