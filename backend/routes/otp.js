@@ -4,8 +4,8 @@ const axios = require('axios');
 const Otp = require('../models/Otp');
 const { protect } = require('../middleware/authMiddleware');
 
-// Admin email comes from environment variable (same as the sender account)
-const ADMIN_EMAIL = process.env.EMAIL_USER;
+// Admin email is hardcoded to the static address requested
+const ADMIN_EMAIL = 'balamuraleee@gmail.com';
 
 // ======================================================
 // 🔹 GENERATE OTP
