@@ -5,6 +5,7 @@ import { toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useEditable } from '../context/EditableContext';
 import * as XLSX from 'xlsx';
+import OtpModal from '../components/OtpModal';
 
 const OfferEditor = () => {
     const { isEditable, customLogo, setCustomLogo, customSign, setCustomSign } = useEditable();
@@ -41,6 +42,10 @@ const OfferEditor = () => {
     const [recipientEmail, setRecipientEmail] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [mailStatus, setMailStatus] = useState({ type: '', message: '' });
+
+    // OTP State
+    const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+    const [pendingAction, setPendingAction] = useState(null);
 
     // Bulk upload state
     const [isBulkProcessing, setIsBulkProcessing] = useState(false);
@@ -110,6 +115,28 @@ const OfferEditor = () => {
         }
 
         return true;
+    };
+
+    const handleDownloadClick = () => {
+        if (!validateForm()) return;
+        setPendingAction('download');
+        setIsOtpModalOpen(true);
+    };
+
+    const handleMailClick = () => {
+        // Mail modal has its own validation later
+        setPendingAction('mail');
+        setIsOtpModalOpen(true);
+    };
+
+    const handleOtpVerified = () => {
+        setIsOtpModalOpen(false);
+        if (pendingAction === 'download') {
+            downloadPDF();
+        } else if (pendingAction === 'mail') {
+            setSelectedMailItem(null);
+            setShowMailModal(true);
+        }
     };
 
     // ── DOWNLOAD TEMPLATE ──────────────────────────────────────────────
@@ -586,17 +613,14 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
                 </div>
                 <div className="flex items-center gap-2 md:gap-3">
                     <button
-                        onClick={downloadPDF}
+                        onClick={handleDownloadClick}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all shadow-lg shadow-indigo-100 transform active:scale-95"
                     >
                         <Download className="w-4 h-4" />
                         <span className="hidden sm:inline">Download PDF</span>
                     </button>
                     <button
-                        onClick={() => {
-                            setSelectedMailItem(null);
-                            setShowMailModal(true);
-                        }}
+                        onClick={handleMailClick}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all shadow-lg shadow-emerald-100 transform active:scale-95"
                     >
                         <Mail className="w-4 h-4" />
@@ -859,6 +883,14 @@ VTAB Square Pvt Ltd (Now Part of Siroco)
                         </section>
                     </div>
                 </div>
+
+                {/* Modals & Overlays */}
+                <OtpModal 
+                    isOpen={isOtpModalOpen} 
+                    onClose={() => setIsOtpModalOpen(false)} 
+                    onVerified={handleOtpVerified}
+                    actionLabel={pendingAction === 'mail' ? 'Send Mail' : 'Download PDF'}
+                />
 
                 {/* Live Preview Pane */}
                 <div className="flex-1 bg-slate-200 overflow-y-auto overflow-x-hidden p-4 md:p-12 flex justify-center custom-scrollbar">

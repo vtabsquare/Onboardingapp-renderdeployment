@@ -43,6 +43,7 @@ const policyAgreementRoutes = require('./routes/policyAgreement');
 const relievingRoutes = require('./routes/relievingExperience');
 const probationRoutes = require('./routes/probationConfirmation');
 const salaryHikeRoutes = require('./routes/salaryHike');
+const otpRoutes = require('./routes/otp');
 
 const app = express();
 
@@ -109,6 +110,7 @@ app.use('/api/policies', policyAgreementRoutes);
 app.use('/api/relieving', relievingRoutes);
 app.use('/api/probation', probationRoutes);
 app.use('/api/salary-hike', salaryHikeRoutes);
+app.use('/api/otp', otpRoutes);
 
 // Health check route for Render
 app.get('/', (req, res) => {
