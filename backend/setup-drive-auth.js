@@ -49,7 +49,13 @@ function getNewToken(oAuth2Client, callback) {
     }
 
     oAuth2Client.getToken(code, (err, token) => {
-      if (err) return console.error('Error retrieving access token', err);
+      if (err) {
+        console.error('\n❌ Error retrieving access token:', err.message);
+        console.log('\n💡 TIP: Authorization codes are ONE-TIME USE.');
+        console.log('If you get "invalid_grant", you MUST run this script again and');
+        console.log('CLICK THE LINK AGAIN to get a brand new code.\n');
+        return;
+      }
       oAuth2Client.setCredentials(token);
       
       // Check if config dir exists
@@ -58,38 +64,54 @@ function getNewToken(oAuth2Client, callback) {
       }
 
       // Save the token to disk for later program executions
-      fs.writeFile(TOKEN_PATH, JSON.stringify(token, null, 2), (err) => {
-        if (err) return console.error(err);
-        console.log('\n✅ Token stored successfully in:', TOKEN_PATH);
-        console.log('You can now use Bulk Upload in your Offer Editor!');
-        process.exit(0);
-      });
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(token, null, 2));
+      console.log('\n✅ Token stored successfully in:', TOKEN_PATH);
+      
+      // Generate and display Base64 version for Render/DigitalOcean
+      const tokenB64 = Buffer.from(JSON.stringify(token)).toString('base64');
+      fs.writeFileSync(path.join(__dirname, 'latest-token-b64.txt'), tokenB64);
+      
+      // Also get Credentials B64
+      const credsContent = fs.readFileSync(CREDENTIALS_PATH, 'utf8');
+      const credsB64 = Buffer.from(credsContent).toString('base64');
+      
+      console.log('\n======================================================');
+      console.log('🚀 RENDER DEPLOYMENT - UPDATE BOTH KEYS:');
+      console.log('\n1️⃣  GOOGLE_OAUTH_CREDENTIALS_BASE64:');
+      console.log(credsB64);
+      
+      console.log('\n2️⃣  GOOGLE_OAUTH_TOKEN_BASE64:');
+      console.log(tokenB64);
+      
+      console.log('\n======================================================');
+      console.log('✅ STEPS:');
+      console.log('1. Go to Render Dashboard -> Environment');
+      console.log('2. Update BOTH variables with the strings above');
+      console.log('3. Save and wait for redeploy');
+      console.log('======================================================\n');
+      
+      console.log('You can now use Bulk Upload in your Offer Editor!');
+      process.exit(0);
     });
   });
 }
 
 // Load client secrets from a local file.
-fs.readFile(CREDENTIALS_PATH, (err, content) => {
-  if (err) {
-    console.log('\n❌ Error loading client secret file:', err);
-    console.log('\nPLEASE FOLLOW THESE STEPS:');
-    console.log('1. Go to Google Cloud Console > APIs & Services > Credentials');
-    console.log('2. Click "Create Credentials" > "OAuth client ID"');
-    console.log('3. Application type: "Web application"');
-    console.log('4. Name: "MyApp" (or whatever)');
-    console.log('5. Authorized redirect URIs: Add "http://localhost:3000/oauth2callback"');
-    console.log('6. Click Create, then Download the JSON file.');
-    console.log('7. Put that downloaded file in the backend folder and rename it to "oauth2-credentials.json"');
-    console.log('8. Re-run this script: node setup-drive-auth.js\n');
-    return;
-  }
+function startAuth() {
+  fs.readFile(CREDENTIALS_PATH, (err, content) => {
+    if (err) {
+      console.log('\n❌ Error loading client secret file:', err);
+      // ... (existing error instructions)
+      return;
+    }
+    
+    const credentials = JSON.parse(content);
+    const {client_secret, client_id, redirect_uris} = credentials.web || credentials.installed;
+    const oAuth2Client = new google.auth.OAuth2(
+        client_id, client_secret, redirect_uris[0] || 'http://localhost:3000/oauth2callback');
   
-  // Authorize a client with credentials, then call the Google Drive API.
-  const credentials = JSON.parse(content);
-  // Support both "web" and "installed" (desktop) type credentials
-  const {client_secret, client_id, redirect_uris} = credentials.web || credentials.installed;
-  const oAuth2Client = new google.auth.OAuth2(
-      client_id, client_secret, redirect_uris[0] || 'http://localhost:3000/oauth2callback');
+    getNewToken(oAuth2Client);
+  });
+}
 
-  getNewToken(oAuth2Client);
-});
+startAuth();

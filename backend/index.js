@@ -8,16 +8,28 @@ const CONFIG_DIR = path.join(__dirname, 'config');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'token.json');
 
 if (process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64) {
-    fs.writeFileSync(CREDENTIALS_PATH, Buffer.from(process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64, 'base64').toString('utf-8'));
-    console.log('✅ Created oauth2-credentials.json from Environment Variable');
+    try {
+        const decoded = Buffer.from(process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+        JSON.parse(decoded); // Validate JSON
+        fs.writeFileSync(CREDENTIALS_PATH, decoded);
+        console.log('✅ Created oauth2-credentials.json from Environment Variable');
+    } catch (err) {
+        console.error('❌ Failed to decode/parse GOOGLE_OAUTH_CREDENTIALS_BASE64:', err.message);
+    }
 }
 
 if (process.env.GOOGLE_OAUTH_TOKEN_BASE64) {
-    if (!fs.existsSync(CONFIG_DIR)) {
-        fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    try {
+        const decoded = Buffer.from(process.env.GOOGLE_OAUTH_TOKEN_BASE64, 'base64').toString('utf-8');
+        JSON.parse(decoded); // Validate JSON
+        if (!fs.existsSync(CONFIG_DIR)) {
+            fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        }
+        fs.writeFileSync(TOKEN_PATH, decoded);
+        console.log('✅ Created config/token.json from Environment Variable');
+    } catch (err) {
+        console.error('❌ Failed to decode/parse GOOGLE_OAUTH_TOKEN_BASE64:', err.message);
     }
-    fs.writeFileSync(TOKEN_PATH, Buffer.from(process.env.GOOGLE_OAUTH_TOKEN_BASE64, 'base64').toString('utf-8'));
-    console.log('✅ Created config/token.json from Environment Variable');
 }
 // -----------------------------------------------------------
 

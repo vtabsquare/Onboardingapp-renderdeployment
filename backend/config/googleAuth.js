@@ -46,7 +46,16 @@ function getOAuth2Client() {
     const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
 
     // Load stored token (includes refresh_token)
-    const storedToken = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
+    let storedToken;
+    try {
+        const tokenContent = fs.readFileSync(TOKEN_PATH, 'utf8');
+        storedToken = JSON.parse(tokenContent);
+    } catch (err) {
+        throw new Error(
+            `Failed to parse config/token.json: ${err.message}. ` +
+            'Your Google Auth token might be corrupted. Please run node setup-drive-auth.js to regenerate it.'
+        );
+    }
     oAuth2Client.setCredentials(storedToken);
 
     // ✅ KEY FIX: Whenever the access token is automatically refreshed,
