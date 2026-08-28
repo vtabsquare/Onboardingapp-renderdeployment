@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import API from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, LogIn, Loader2, AlertCircle } from "lucide-react";
@@ -10,6 +10,29 @@ export default function Login() {
     const [msg, setMsg] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    // VTAB 365 SSO — catch ?token= from URL and auto-login
+    useEffect(() => {
+        const ssoToken = new URLSearchParams(window.location.search).get("token");
+        if (ssoToken) {
+            setLoading(true);
+            API.post("/user-auth/vtab-sso", { token: ssoToken })
+                .then(res => {
+                    if (res.data.success) {
+                        localStorage.removeItem("adminToken");
+                        localStorage.removeItem("faceMatchToken");
+                        localStorage.setItem("token", res.data.token);
+                        localStorage.setItem("userToken", res.data.token);
+                        localStorage.setItem("role", "user");
+                        navigate("/editor");
+                    }
+                })
+                .catch(err => {
+                    setMsg(err.response?.data?.message || "SSO connection failed. Please try again.");
+                    setLoading(false);
+                });
+        }
+    }, [navigate]);
 
     const submit = async (e) => {
         e.preventDefault();

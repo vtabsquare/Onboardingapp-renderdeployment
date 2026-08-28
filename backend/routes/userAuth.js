@@ -271,4 +271,46 @@ router.get('/admin/users', protect, async (req, res) => {
     }
 });
 
+// ======================================================
+// 🔹 VTAB SSO LOGIN
+// ======================================================
+router.post('/vtab-sso', async (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) return res.status(400).json({ message: 'Missing SSO token' });
+        
+        const ssoSecret = process.env.VTAB_SSO_SECRET;
+        if (!ssoSecret) return res.status(500).json({ message: 'SSO not configured on server' });
+
+        const decoded = jwt.verify(token, ssoSecret, {
+            algorithms: ['HS256'],
+            audience: 'onboard360',
+            issuer: 'vtab360'
+        });
+
+        if (decoded.purpose !== 'vtab_sso') {
+            return res.status(400).json({ message: 'Invalid token purpose' });
+        }
+
+        const email = decoded.email.toLowerCase();
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(403).json({ message: 'SSO user is not registered in Onboard360.' });
+        }
+
+        // Return standard auth token, bypassing face match
+        const authToken = generateUserToken(user, 'auth');
+        res.json({
+            success: true,
+            token: authToken,
+            message: 'SSO login successful.'
+        });
+
+    } catch (err) {
+        console.error('VTAB SSO Error:', err);
+        res.status(401).json({ message: 'SSO token invalid or expired. Please click the app again in VTAB 365.' });
+    }
+});
+
 module.exports = router;
